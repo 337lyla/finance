@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ABC주식회사 · 재무 현황 공유</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></script>
 <style>
 :root{
   --bg:#f7f7f5;--surface:#fff;--surface2:#f0efec;
@@ -273,7 +273,6 @@ tr:hover td{background:var(--surface2);}
 </div>
 
 <script>
-const supabase = window.supabase;
 let sbClient = null;
 let state = { pl:null, tax:null, bank:null };
 let allTaxRows = [], allBankRows = [];
@@ -296,7 +295,7 @@ function connectSupabase(){
   const key = document.getElementById('sbKey').value.trim();
   if(!url||!key){ document.getElementById('sbStatus').innerHTML='<span class="sb-err">URL과 Key를 입력해주세요.</span>'; return; }
   try{
-    sbClient = supabase.createClient(url, key);
+    sbClient = window.supabase.createClient(url, key);
     document.getElementById('sbStatus').innerHTML='<span class="sb-ok">✓ 연결됨. 데이터를 불러오는 중...</span>';
     loadFromSupabase();
   } catch(e){ document.getElementById('sbStatus').innerHTML='<span class="sb-err">연결 실패: '+e.message+'</span>'; }
