@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ABC주식회사 · 재무 현황 공유</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></script>
+<style>
+:root{
+  --bg:#f7f7f5;--surface:#fff;--surface2:#f0efec;
+  --border:rgba(0,0,0,0.08);--border-s:rgba(0,0,0,0.15);
+  --text:#1a1a18;--sub:#6b6b67;--muted:#9f9f9a;
+  --purple:#534AB7;--purple-l:#EEEDFE;--purple-d:#3C3489;
+  --green:#1D9E75;--green-l:#EAF3DE;--green-d:#27500A;
+  --red:#E24B4A;--red-l:#FCEBEB;--red-d:#791F1F;
+  --amber:#BA7517;--amber-l:#FAEEDA;--amber-d:#633806;
+  --blue:#185FA5;--blue-l:#E6F1FB;--blue-d:#042C53;
+  --r:10px;--rl:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;}
+.page{max-width:1200px;margin:0 auto;padding:24px 20px 60px;}
+
+/* topbar */
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:0.5px solid var(--border-s);}
+.logo{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;}
+.logo-icon{width:32px;height:32px;background:var(--purple);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;}
+.badge{font-size:11px;padding:4px 10px;border-radius:20px;font-family:'IBM Plex Mono',monospace;}
+.badge-view{background:var(--blue-l);color:var(--blue-d);border:0.5px solid var(--blue);}
+.badge-time{background:var(--surface2);color:var(--sub);border:0.5px solid var(--border-s);}
+
+/* tabs */
+.tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--surface2);padding:4px;border-radius:var(--r);width:fit-content;}
+.tab{padding:8px 20px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;color:var(--sub);border:none;background:transparent;font-family:'Noto Sans KR',sans-serif;transition:all .15s;}
+.tab.active{background:var(--surface);color:var(--purple);box-shadow:0 1px 3px rgba(0,0,0,0.1);}
+.tab:hover:not(.active){color:var(--text);}
+
+/* upload */
+.upload-zone{border:2px dashed var(--border-s);border-radius:var(--rl);padding:24px;text-align:center;background:var(--surface);cursor:pointer;margin-bottom:16px;}
+.upload-zone.drag{border-color:var(--purple);background:var(--purple-l);}
+.upload-zone.done{border-color:var(--green);background:var(--green-l);}
+.upload-btn{display:inline-block;margin-top:8px;padding:7px 18px;background:var(--purple);color:#fff;border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer;border:none;font-family:'Noto Sans KR',sans-serif;}
+
+/* metrics */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;}
+.metric{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rl);padding:14px 16px;}
+.metric-label{font-size:11px;color:var(--muted);font-weight:500;margin-bottom:6px;letter-spacing:.04em;text-transform:uppercase;}
+.metric-value{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace;letter-spacing:-.5px;margin-bottom:3px;}
+.metric-sub{font-size:11px;}
+.up{color:var(--green);}.dn{color:var(--red);}
+
+/* grid */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px;}
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rl);padding:18px;}
+.card-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:6px;}
+.card-icon{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;}
+
+/* chart */
+.chart-wrap{position:relative;width:100%;}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--sub);margin-bottom:10px;}
+.legend span{display:flex;align-items:center;gap:4px;}
+.leg-dot{width:9px;height:3px;border-radius:2px;display:inline-block;}
+
+/* table */
+.tbl-wrap{overflow-x:auto;max-height:320px;overflow-y:auto;}
+.tbl-wrap::-webkit-scrollbar{width:4px;height:4px;}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--border-s);border-radius:4px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{position:sticky;top:0;text-align:left;padding:7px 8px;font-weight:500;color:var(--muted);background:var(--surface2);border-bottom:0.5px solid var(--border-s);font-size:11px;white-space:nowrap;z-index:1;}
+td{padding:7px 8px;border-bottom:0.5px solid var(--border);vertical-align:middle;white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--surface2);}
+.tr{text-align:right;font-family:'IBM Plex Mono',monospace;}
+.tc{text-align:center;}
+.tag{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;display:inline-block;}
+.tag-green{background:var(--green-l);color:var(--green-d);}
+.tag-blue{background:var(--blue-l);color:var(--blue-d);}
+.tag-amber{background:var(--amber-l);color:var(--amber-d);}
+.tag-red{background:var(--red-l);color:var(--red-d);}
+.tag-gray{background:var(--surface2);color:var(--sub);border:0.5px solid var(--border-s);}
+
+/* filter bar */
+.filter-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;}
+.filter-bar select,.filter-bar input{font-size:12px;font-family:'Noto Sans KR',sans-serif;padding:6px 10px;border:0.5px solid var(--border-s);border-radius:var(--r);background:var(--surface2);color:var(--text);outline:none;}
+.filter-bar select:focus,.filter-bar input:focus{border-color:var(--purple);}
+.filter-label{font-size:12px;color:var(--sub);}
+.filter-count{font-size:11px;color:var(--muted);margin-left:auto;font-family:'IBM Plex Mono',monospace;}
+
+/* supabase panel */
+.sb-panel{background:var(--purple-l);border:0.5px solid var(--purple);border-radius:var(--rl);padding:16px 20px;margin-bottom:16px;}
+.sb-title{font-size:13px;font-weight:700;color:var(--purple-d);margin-bottom:8px;}
+.sb-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.sb-input{flex:1;min-width:200px;font-size:12px;font-family:'IBM Plex Mono',monospace;padding:7px 12px;border:0.5px solid var(--purple);border-radius:var(--r);background:#fff;color:var(--text);outline:none;}
+.sb-btn{padding:7px 16px;background:var(--purple);color:#fff;border:none;border-radius:var(--r);font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;white-space:nowrap;}
+.sb-btn:hover{background:var(--purple-d);}
+.sb-status{font-size:11px;margin-top:6px;}
+.sb-ok{color:var(--green-d);}
+.sb-err{color:var(--red-d);}
+
+/* no-data */
+.no-data{text-align:center;padding:40px;color:var(--muted);font-size:13px;}
+
+/* section */
+.section{display:none;}
+.section.active{display:block;}
+
+.dot-live{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+
+@media(max-width:700px){
+  .metrics{grid-template-columns:repeat(2,1fr);}
+  .grid2,.grid3{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- topbar -->
+  <div class="topbar">
+    <div class="logo">
+      <div class="logo-icon">D</div>
+      ABC주식회사 · 재무 현황
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="badge badge-view">👥 팀 공유 뷰</span>
+      <span class="badge badge-time" id="lastUpdated">업데이트: -</span>
+    </div>
+  </div>
+
+  <!-- Supabase 연결 패널 -->
+  <details style="margin-bottom:12px;display:none;">
+    <summary style="cursor:pointer;font-size:12px;color:var(--sub);padding:8px 12px;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);list-style:none;">🔗 Supabase 연결 (선택사항 - 팀 공유 저장용)</summary>
+    <div class="sb-panel" style="margin-top:8px;">
+      <div class="sb-row">
+        <input class="sb-input" id="sbUrl" placeholder="Supabase Project URL (https://xxx.supabase.co)">
+        <input class="sb-input" id="sbKey" placeholder="Supabase Anon Key" type="password">
+        <button class="sb-btn" onclick="connectSupabase()">연결</button>
+      </div>
+      <div class="sb-status" id="sbStatus">연결하면 업로드한 데이터가 저장되어 팀원이 URL만으로 볼 수 있습니다.</div>
+    </div>
+  </details>
+
+  <!-- 파일 업로드 -->
+  <div id="localUploads">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div class="upload-zone" id="zone-pl">
+        <div style="font-size:20px;">📊</div>
+        <div style="font-size:13px;font-weight:700;margin:4px 0;">손익계산서</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">xlsx 업로드</div>
+        <label for="file-pl" class="upload-btn" style="display:inline-block;cursor:pointer;">파일 선택</label>
+        <input type="file" id="file-pl" accept=".xlsx,.xls" style="display:none" onchange="handleFile('pl',this.files[0])">
+      </div>
+      <div class="upload-zone" id="zone-tax">
+        <div style="font-size:20px;">🧾</div>
+        <div style="font-size:13px;font-weight:700;margin:4px 0;">매입매출장</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">xlsx 업로드</div>
+        <label for="file-tax" class="upload-btn" style="display:inline-block;cursor:pointer;">파일 선택</label>
+        <input type="file" id="file-tax" accept=".xlsx,.xls" style="display:none" onchange="handleFile('tax',this.files[0])">
+      </div>
+      <div class="upload-zone" id="zone-bank">
+        <div style="font-size:20px;">🏦</div>
+        <div style="font-size:13px;font-weight:700;margin:4px 0;">통장내역</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">xlsx 업로드</div>
+        <label for="file-bank" class="upload-btn" style="display:inline-block;cursor:pointer;">파일 선택</label>
+        <input type="file" id="file-bank" accept=".xlsx,.xls" style="display:none" onchange="handleFile('bank',this.files[0])">
+      </div>
+    </div>
+  </div>
+
+  <!-- 탭 -->
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('overview')">📈 매출 현황</button>
+    <button class="tab" onclick="showTab('tax')">🧾 세금계산서</button>
+    <button class="tab" onclick="showTab('bank')">🏦 입출금 내역</button>
+  </div>
+
+  <!-- ① 매출 현황 -->
+  <div class="section active" id="sec-overview">
+    <div class="metrics" id="overviewMetrics">
+      <div class="metric"><div class="metric-label">누적 매출액</div><div class="metric-value" id="m-sales">-</div><div class="metric-sub" id="m-sales-sub">데이터 없음</div></div>
+      <div class="metric"><div class="metric-label">누적 영업이익</div><div class="metric-value" id="m-profit">-</div><div class="metric-sub up" id="m-profit-sub">-</div></div>
+      <div class="metric"><div class="metric-label">온라인광고 매출</div><div class="metric-value" id="m-online">-</div><div class="metric-sub up" id="m-online-sub">-</div></div>
+      <div class="metric"><div class="metric-label">기타 매출</div><div class="metric-value" id="m-etc">-</div><div class="metric-sub" id="m-etc-sub">-</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title"><div class="card-icon" style="background:var(--purple-l);color:var(--purple);">📈</div>월별 매출액 추이</div>
+        <div class="legend">
+          <span><span class="leg-dot" style="background:#534AB7;"></span>전체 매출</span>
+          <span><span class="leg-dot" style="background:#1D9E75;"></span>온라인광고</span>
+          <span><span class="leg-dot" style="background:#E24B4A;"></span>기타</span>
+        </div>
+        <div class="chart-wrap" style="height:200px;"><canvas id="salesChart" role="img" aria-label="월별 매출 추이">매출 추이</canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><div class="card-icon" style="background:var(--green-l);color:var(--green);">🥧</div>매출 구성비</div>
+        <div class="chart-wrap" style="height:200px;"><canvas id="pieChart" role="img" aria-label="매출 구성비">매출 구성</canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><div class="card-icon" style="background:var(--purple-l);color:var(--purple);">📋</div>매출 유형별 월별 상세</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>매출 유형</th><th class="tr">1월</th><th class="tr">2월</th><th class="tr">3월</th><th class="tr">4월</th><th class="tr">5월</th><th class="tr">합계</th><th class="tr">비중</th></tr></thead>
+          <tbody id="salesDetailBody"><tr><td colspan="8" class="no-data">손익계산서를 업로드하면 표시됩니다</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 세금계산서 -->
+  <div class="section" id="sec-tax">
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">매출 발행 건수</div><div class="metric-value" id="t-out-cnt">-</div><div class="metric-sub up" id="t-out-amt">-</div></div>
+      <div class="metric"><div class="metric-label">매출 발행 금액</div><div class="metric-value" id="t-out-sum">-</div><div class="metric-sub" id="t-out-tax">세액 포함</div></div>
+      <div class="metric"><div class="metric-label">매입 수취 건수</div><div class="metric-value" id="t-in-cnt">-</div><div class="metric-sub" id="t-in-amt">-</div></div>
+      <div class="metric"><div class="metric-label">발행예정 건수</div><div class="metric-value" id="t-pending">-</div><div class="metric-sub warn" id="t-pending-sub">확인 필요</div></div>
+    </div>
+    <div class="filter-bar">
+      <span class="filter-label">구분</span>
+      <select id="taxTypeFilter" onchange="filterTax()"><option value="all">전체</option><option value="매출">매출세금계산서</option><option value="매입">매입세금계산서</option></select>
+      <span class="filter-label">월</span>
+      <select id="taxMonthFilter" onchange="filterTax()"><option value="all">전체</option></select>
+      <span class="filter-label">유형</span>
+      <select id="taxCatFilter" onchange="filterTax()"><option value="all">전체</option></select>
+      <span class="filter-label">상태</span>
+      <select id="taxStatusFilter" onchange="filterTax()"><option value="all">전체</option><option value="발행완료">발행완료</option><option value="발행예정">발행예정</option><option value="처리완료">처리완료</option></select>
+      <span class="filter-count" id="taxCount">0건</span>
+    </div>
+    <div class="card" style="padding:0;">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>구분</th><th>발행/수취일</th><th>거래처</th><th>품목</th><th class="tr">공급가액</th><th class="tr">세액</th><th class="tr">합계</th><th class="tc">유형</th><th class="tc">상태</th></tr></thead>
+          <tbody id="taxBody"><tr><td colspan="9" class="no-data">매입매출장을 업로드하면 표시됩니다</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ 입출금 내역 -->
+  <div class="section" id="sec-bank">
+    <div class="metrics">
+      <div class="metric"><div class="metric-label">총 입금</div><div class="metric-value up" id="b-in">-</div><div class="metric-sub" id="b-in-cnt">-</div></div>
+      <div class="metric"><div class="metric-label">총 출금</div><div class="metric-value dn" id="b-out">-</div><div class="metric-sub" id="b-out-cnt">-</div></div>
+      <div class="metric"><div class="metric-label">순 현금흐름</div><div class="metric-value" id="b-net">-</div><div class="metric-sub" id="b-net-sub">-</div></div>
+      <div class="metric"><div class="metric-label">최근 잔액</div><div class="metric-value" id="b-bal">-</div><div class="metric-sub" style="color:var(--muted);">최종 거래 기준</div></div>
+    </div>
+    <div class="filter-bar">
+      <span class="filter-label">월</span>
+      <select id="bankMonthFilter" onchange="filterBank()"><option value="all">전체</option></select>
+      <span class="filter-label">유형</span>
+      <select id="bankTypeFilter" onchange="filterBank()"><option value="all">전체</option><option value="입금">입금만</option><option value="출금">출금만</option></select>
+      <span class="filter-label">거래유형</span>
+      <select id="bankCatFilter" onchange="filterBank()"><option value="all">전체</option></select>
+      <input id="bankSearch" placeholder="거래처 검색..." style="font-size:12px;padding:6px 10px;border:0.5px solid var(--border-s);border-radius:var(--r);background:var(--surface2);outline:none;font-family:'Noto Sans KR',sans-serif;" oninput="filterBank()">
+      <span class="filter-count" id="bankCount">0건</span>
+    </div>
+    <div class="card" style="padding:0;">
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>거래일자</th><th>시간</th><th>적요</th><th>거래처</th><th class="tr">입금액</th><th class="tr">출금액</th><th class="tr">잔액</th><th class="tc">거래유형</th></tr></thead>
+          <tbody id="bankBody"><tr><td colspan="8" class="no-data">통장내역을 업로드하면 표시됩니다</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let sbClient = null;
+
+// 자동 연결
+window.addEventListener('load', () => {
+  const SB_URL = 'https://wxnrjooxtpchmdmcssqe.supabase.co';
+  const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind4bnJqb294dHBjaG1kbWNzc3FlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0NTYzNTYsImV4cCI6MjA5NjAzMjM1Nn0.nsFX_dL0xbMtDuhAmHoRrcme9w4PGmg-YiQWbTzAdFQ';
+  setTimeout(() => {
+    try {
+      sbClient = window.supabase.createClient(SB_URL, SB_KEY);
+      loadFromSupabase();
+    } catch(e) {
+      console.warn('자동 연결 실패:', e.message);
+    }
+  }, 500);
+});
+let state = { pl:null, tax:null, bank:null };
+let allTaxRows = [], allBankRows = [];
+let salesChartInst = null, pieChartInst = null;
+
+function fmt(v){ if(!v||isNaN(v))return'-'; const a=Math.abs(v); if(a>=100000000)return (v/100000000).toFixed(1)+'억'; if(a>=10000)return Math.round(v/10000).toLocaleString()+'만'; return Math.round(v).toLocaleString(); }
+function fmtNum(v){ return v?Math.round(v).toLocaleString():'-'; }
+
+// ── 탭 전환 ──
+function showTab(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ── Supabase 연결 ──
+function connectSupabase(){
+  const url = document.getElementById('sbUrl').value.trim();
+  const key = document.getElementById('sbKey').value.trim();
+  if(!url||!key){ document.getElementById('sbStatus').innerHTML='<span class="sb-err">URL과 Key를 입력해주세요.</span>'; return; }
+  try{
+    sbClient = window.supabase.createClient(url, key);
+    document.getElementById('sbStatus').innerHTML='<span class="sb-ok">✓ 연결됨. 데이터를 불러오는 중...</span>';
+    loadFromSupabase();
+  } catch(e){ document.getElementById('sbStatus').innerHTML='<span class="sb-err">연결 실패: '+e.message+'</span>'; }
+}
+
+async function loadFromSupabase(){
+  if(!sbClient) return;
+  try{
+    const {data,error} = await sbClient.from('finance_data').select('*').order('created_at',{ascending:false}).limit(1);
+    if(error) throw error;
+    if(data && data.length>0){
+      const d = data[0];
+      if(d.pl_data) { state.pl = d.pl_data; try{ renderOverview(); }catch(e){ console.warn('overview err',e); } }
+      if(d.tax_data) { state.tax = d.tax_data; try{ renderTax(); }catch(e){ console.warn('tax err',e); } }
+      if(d.bank_data) { state.bank = d.bank_data; try{ renderBank(); }catch(e){ console.warn('bank err',e); } }
+      const lu = document.getElementById('lastUpdated'); if(lu) lu.textContent = '업데이트: '+new Date(d.created_at).toLocaleString('ko-KR');
+      const sp = document.getElementById('sbPanel'); if(sp) sp.style.display='none';
+      document.getElementById('localUploads').style.display='none';
+    } else {
+      document.getElementById('sbStatus').innerHTML='<span class="sb-ok">✓ 연결됨.</span> 저장된 데이터가 없습니다. 파일을 업로드해주세요.';
+      useLocalMode();
+    }
+  } catch(e){ document.getElementById('sbStatus').innerHTML='<span class="sb-err">데이터 로드 실패: '+e.message+'</span>'; useLocalMode(); }
+}
+
+async function saveToSupabase(){
+  if(!sbClient) return;
+  try{
+    await sbClient.from('finance_data').insert([{pl_data:state.pl, tax_data:state.tax, bank_data:state.bank, created_at:new Date().toISOString()}]);
+    document.getElementById('sbStatus').innerHTML='<span class="sb-ok">✓ Supabase에 저장 완료! 팀원들이 URL로 접속하면 바로 볼 수 있습니다.</span>';
+    document.getElementById('lastUpdated').textContent = '업데이트: '+new Date().toLocaleString('ko-KR');
+  } catch(e){ console.warn('Supabase 저장 실패:', e.message); }
+}
+
+function useLocalMode(){
+  document.getElementById('localUploads').style.display='block';
+  document.getElementById('sbPanel').style.display='none';
+}
+
+function showLocalUploads(){
+  document.getElementById('localUploads').style.display='block';
+}
+
+// ── 파일 업로드 ──
+function handleFile(type, file){
+  if(!file) return;
+  const zone = document.getElementById('zone-'+type);
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, {type:'array'});
+    const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+    state[type] = raw;
+    zone.classList.remove('drag'); zone.classList.add('done');
+    zone.querySelector('div:nth-child(2)').textContent = '✓ '+file.name;
+    if(type==='pl') renderOverview();
+    if(type==='tax') renderTax();
+    if(type==='bank') renderBank();
+    if(sbClient) saveToSupabase();
+    document.getElementById('lastUpdated').textContent='업데이트: '+new Date().toLocaleString('ko-KR');
+    // 두번째 시트도 로드 (매입)
+    if(type==='tax' && wb.SheetNames.length>1){
+      const raw2 = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[1]], {header:1, defval:''});
+      state.tax2 = raw2;
+      renderTax();
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── 매출 현황 렌더 ──
+function renderOverview(){
+  const raw = state.pl; if(!raw) return;
+  let headerRow=-1, headers=[];
+  for(let i=0;i<Math.min(raw.length,10);i++){
+    const row=raw[i].map(c=>String(c).trim());
+    if(row.filter(c=>/\d+월/.test(c)).length>=2){headerRow=i;headers=row;break;}
+  }
+  if(headerRow===-1) return;
+  const monthCols=[];
+  headers.forEach((h,i)=>{if(/\d+월/.test(String(h).trim()))monthCols.push({label:String(h).trim(),idx:i});});
+  const rows=[];
+  for(let i=headerRow+1;i<raw.length;i++){
+    const r=raw[i]; const name=String(r[0]||'').replace(/\s+/g,'').replace(/[ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩ\.]/g,'');
+    if(!name) continue;
+    const vals=monthCols.map(m=>{const v=r[m.idx];return(v===''||v===null)?0:Number(v)||0;});
+    rows.push({name,orig:String(r[0]||'').trim(),vals});
+  }
+  const find=(keys)=>rows.find(r=>keys.some(k=>r.name.includes(k)));
+  const salesRow=find(['매출액']); const profitRow=find(['영업이익']); const onlineRow=find(['로톡온라인광고매출','온라인광고매출']);
+  const validMonths=monthCols.filter((_,i)=>salesRow&&salesRow.vals[i]!==0).map(m=>m.label);
+  const sum=(row)=>validMonths.reduce((s,m)=>{const idx=monthCols.findIndex(mc=>mc.label===m);return s+(row&&idx>=0?row.vals[idx]:0);},0);
+  const totalSales=sum(salesRow), totalProfit=sum(profitRow), totalOnline=sum(onlineRow), totalEtc=totalSales-totalOnline;
+
+  document.getElementById('m-sales').textContent=fmt(totalSales);
+  document.getElementById('m-sales-sub').textContent=validMonths.length+'개월 누적';
+  document.getElementById('m-profit').textContent=fmt(totalProfit);
+  document.getElementById('m-profit-sub').textContent='영업이익률 '+(totalSales?(totalProfit/totalSales*100).toFixed(1):'0')+'%';
+  document.getElementById('m-online').textContent=fmt(totalOnline);
+  document.getElementById('m-online-sub').textContent='전체의 '+(totalSales?(totalOnline/totalSales*100).toFixed(1):'0')+'%';
+  document.getElementById('m-etc').textContent=fmt(totalEtc);
+  document.getElementById('m-etc-sub').textContent='기타마케팅+AI 등';
+
+  // 매출 유형 추출
+  const revenueTypes=['로톡온라인광고매출','로톡오프라인광고매출','로톡기타광고매출','기타마케팅국내매출','기타마케팅해외매출','상담AI매출'];
+  const typeRows=revenueTypes.map(t=>({name:t,row:find([t.replace(/\s/g,'')])})).filter(t=>t.row);
+
+  // 상세 테이블
+  const totalSalesByType=typeRows.map(t=>sum(t.row));
+  const grandTotal=totalSalesByType.reduce((a,b)=>a+b,0)||totalSales;
+  const monthLabels=validMonths.map(m=>m.replace('월',''));
+  document.getElementById('salesDetailBody').innerHTML=typeRows.map((t,ti)=>{
+    const mVals=validMonths.map(m=>{const idx=monthCols.findIndex(mc=>mc.label===m);return t.row&&idx>=0?t.row.vals[idx]:0;});
+    const s=totalSalesByType[ti]; const pct=grandTotal?(s/grandTotal*100).toFixed(1):'0';
+    return `<tr><td>${t.name}</td>${mVals.map(v=>`<td class="tr">${v?Math.round(v/10000).toLocaleString()+'만':'-'}</td>`).join('')}<td class="tr" style="font-weight:700;">${fmt(s)}</td><td class="tr">${pct}%</td></tr>`;
+  }).join('')||'<tr><td colspan="8" class="no-data">데이터 없음</td></tr>';
+
+  // 차트
+  const labels=validMonths;
+  const salesData=labels.map(m=>{const idx=monthCols.findIndex(mc=>mc.label===m);return salesRow&&idx>=0?Math.round(salesRow.vals[idx]/10000):0;});
+  const onlineData=labels.map(m=>{const idx=monthCols.findIndex(mc=>mc.label===m);return onlineRow&&idx>=0?Math.round(onlineRow.vals[idx]/10000):0;});
+  const etcData=salesData.map((s,i)=>s-onlineData[i]);
+  if(salesChartInst){salesChartInst.destroy();}
+  salesChartInst=new Chart(document.getElementById('salesChart'),{
+    data:{labels,datasets:[
+      {type:'line',label:'전체매출',data:salesData,borderColor:'#534AB7',tension:.3,pointRadius:4,pointBackgroundColor:'#534AB7',fill:false},
+      {type:'bar',label:'온라인광고',data:onlineData,backgroundColor:'rgba(29,158,117,0.3)',borderColor:'#1D9E75',borderWidth:1,borderRadius:4},
+      {type:'bar',label:'기타',data:etcData,backgroundColor:'rgba(226,75,74,0.2)',borderColor:'#E24B4A',borderWidth:1,borderRadius:4}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{
+      y:{grid:{color:'rgba(0,0,0,0.05)'},ticks:{callback:v=>v>=10000?(v/10000).toFixed(0)+'억':v+'만',font:{size:10}}},
+      x:{grid:{display:false},ticks:{font:{size:11},autoSkip:false}}
+    }}
+  });
+  // 파이차트
+  const pieLabels=typeRows.map(t=>t.name); const pieData=totalSalesByType;
+  const pieColors=['#534AB7','#1D9E75','#E24B4A','#BA7517','#185FA5','#D4537E'];
+  if(pieChartInst){pieChartInst.destroy();}
+  pieChartInst=new Chart(document.getElementById('pieChart'),{
+    type:'doughnut',
+    data:{labels:pieLabels,datasets:[{data:pieData,backgroundColor:pieColors,borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:10},padding:8}}}}
+  });
+}
+
+// ── 세금계산서 렌더 ──
+function renderTax(){
+  const parseSheet=(raw)=>{
+    if(!raw||raw.length<3) return [];
+    const headers=raw[1].map(c=>String(c).trim());
+    const rows=[];
+    for(let i=2;i<raw.length;i++){
+      const r=raw[i]; if(!r[0]) continue;
+      const obj={};
+      headers.forEach((h,j)=>{obj[h]=r[j]||'';});
+      rows.push(obj);
+    }
+    return rows;
+  };
+  const outRows=parseSheet(state.tax).map(r=>({...r,_type:'매출'}));
+  const inRows=parseSheet(state.tax2||[]).map(r=>({...r,_type:'매입'}));
+  allTaxRows=[...outRows,...inRows].sort((a,b)=>String(a['발행일자']||a['수취일자']).localeCompare(String(b['발행일자']||b['수취일자'])));
+
+  // 필터 옵션
+  const months=[...new Set(allTaxRows.map(r=>{const d=String(r['발행일자']||r['수취일자']||'');return d.slice(0,7);}))].sort();
+  const cats=[...new Set(allTaxRows.map(r=>r['매출유형']||r['비용유형']||''))].filter(Boolean);
+  document.getElementById('taxMonthFilter').innerHTML='<option value="all">전체</option>'+months.map(m=>`<option value="${m}">${m}</option>`).join('');
+  document.getElementById('taxCatFilter').innerHTML='<option value="all">전체</option>'+cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+
+  // 지표
+  const outOnly=outRows; const inOnly=inRows;
+  const sumField=(rows,field)=>rows.reduce((s,r)=>s+(Number(String(r[field]).replace(/,/g,''))||0),0);
+  document.getElementById('t-out-cnt').textContent=(outOnly.length||'-')+'건';
+  document.getElementById('t-out-sum').textContent=fmt(sumField(outOnly,'합계금액'));
+  document.getElementById('t-out-tax').textContent='세액 '+fmt(sumField(outOnly,'세액'));
+  document.getElementById('t-out-amt').textContent='공급가 '+fmt(sumField(outOnly,'공급가액'));
+  document.getElementById('t-in-cnt').textContent=(inOnly.length||'-')+'건';
+  document.getElementById('t-in-amt').textContent='합계 '+fmt(sumField(inOnly,'합계금액'));
+  const pending=outOnly.filter(r=>String(r['발행상태']).includes('예정'));
+  document.getElementById('t-pending').textContent=pending.length+'건';
+  document.getElementById('t-pending-sub').textContent=pending.length>0?'즉시 발행 필요':'이상 없음';
+
+  filterTax();
+}
+
+function filterTax(){
+  const typeF=document.getElementById('taxTypeFilter').value;
+  const monthF=document.getElementById('taxMonthFilter').value;
+  const catF=document.getElementById('taxCatFilter').value;
+  const statusF=document.getElementById('taxStatusFilter').value;
+  let rows=allTaxRows.filter(r=>{
+    if(typeF!=='all'&&r._type!==typeF) return false;
+    const d=String(r['발행일자']||r['수취일자']||'');
+    if(monthF!=='all'&&!d.startsWith(monthF)) return false;
+    const cat=r['매출유형']||r['비용유형']||'';
+    if(catF!=='all'&&cat!==catF) return false;
+    const st=String(r['발행상태']||r['처리상태']||'');
+    if(statusF!=='all'&&st!==statusF) return false;
+    return true;
+  });
+  document.getElementById('taxCount').textContent=rows.length+'건';
+  const stTag=(st)=>{
+    if(st.includes('완료')) return '<span class="tag tag-green">'+st+'</span>';
+    if(st.includes('예정')) return '<span class="tag tag-amber">'+st+'</span>';
+    return '<span class="tag tag-gray">'+st+'</span>';
+  };
+  const typeTag=(t)=>t==='매출'?'<span class="tag tag-blue">매출</span>':'<span class="tag tag-gray">매입</span>';
+  document.getElementById('taxBody').innerHTML=rows.length?rows.map(r=>{
+    const supply=Number(String(r['공급가액']||0).replace(/,/g,''));
+    const tax=Number(String(r['세액']||0).replace(/,/g,''));
+    const total=Number(String(r['합계금액']||0).replace(/,/g,''));
+    const d=String(r['발행일자']||r['수취일자']||'');
+    const comp=String(r['공급받는자']||r['공급자']||'');
+    const item=String(r['품목']||'');
+    const st=String(r['발행상태']||r['처리상태']||'');
+    const cat=String(r['매출유형']||r['비용유형']||'');
+    return `<tr><td>${typeTag(r._type)}</td><td>${d}</td><td>${comp}</td><td>${item}</td><td class="tr">${supply?Math.round(supply).toLocaleString():'-'}</td><td class="tr">${tax?Math.round(tax).toLocaleString():'-'}</td><td class="tr" style="font-weight:500;">${total?Math.round(total).toLocaleString():'-'}</td><td class="tc"><span class="tag tag-gray" style="font-size:10px;">${cat}</span></td><td class="tc">${stTag(st)}</td></tr>`;
+  }).join(''):'<tr><td colspan="9" class="no-data">해당하는 항목이 없습니다</td></tr>';
+}
+
+// ── 통장내역 렌더 ──
+function renderBank(){
+  const raw=state.bank; if(!raw) return;
+  const headers=raw[1].map(c=>String(c).trim());
+  allBankRows=[];
+  for(let i=2;i<raw.length;i++){
+    const r=raw[i]; if(!r[0]) continue;
+    const obj={};
+    headers.forEach((h,j)=>{obj[h]=r[j]||'';});
+    allBankRows.push(obj);
+  }
+  // 필터 옵션
+  const months=[...new Set(allBankRows.map(r=>{const d=String(r['거래일자']||'');return d.slice(0,7);}))].sort();
+  const cats=[...new Set(allBankRows.map(r=>String(r['거래유형']||'')))].filter(Boolean);
+  document.getElementById('bankMonthFilter').innerHTML='<option value="all">전체</option>'+months.map(m=>`<option value="${m}">${m}</option>`).join('');
+  document.getElementById('bankCatFilter').innerHTML='<option value="all">전체</option>'+cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+
+  // 지표
+  const totalIn=allBankRows.reduce((s,r)=>s+(Number(String(r['입금액']||0).replace(/,/g,''))||0),0);
+  const totalOut=allBankRows.reduce((s,r)=>s+(Number(String(r['출금액']||0).replace(/,/g,''))||0),0);
+  const lastBal=allBankRows.length?Number(String(allBankRows[allBankRows.length-1]['잔액']||0).replace(/,/g,'')):0;
+  document.getElementById('b-in').textContent=fmt(totalIn);
+  document.getElementById('b-in-cnt').textContent=allBankRows.filter(r=>Number(String(r['입금액']||0).replace(/,/g,''))>0).length+'건 입금';
+  document.getElementById('b-out').textContent=fmt(totalOut);
+  document.getElementById('b-out-cnt').textContent=allBankRows.filter(r=>Number(String(r['출금액']||0).replace(/,/g,''))>0).length+'건 출금';
+  document.getElementById('b-net').textContent=fmt(totalIn-totalOut);
+  document.getElementById('b-net-sub').innerHTML=(totalIn-totalOut)>=0?'<span class="up">순 유입</span>':'<span class="dn">순 유출</span>';
+  document.getElementById('b-bal').textContent=fmt(lastBal);
+  filterBank();
+}
+
+function filterBank(){
+  const monthF=document.getElementById('bankMonthFilter').value;
+  const typeF=document.getElementById('bankTypeFilter').value;
+  const catF=document.getElementById('bankCatFilter').value;
+  const searchF=(document.getElementById('bankSearch').value||'').toLowerCase();
+  let rows=allBankRows.filter(r=>{
+    const d=String(r['거래일자']||'');
+    if(monthF!=='all'&&!d.startsWith(monthF)) return false;
+    const inc=Number(String(r['입금액']||0).replace(/,/g,''));
+    const out=Number(String(r['출금액']||0).replace(/,/g,''));
+    if(typeF==='입금'&&inc<=0) return false;
+    if(typeF==='출금'&&out<=0) return false;
+    if(catF!=='all'&&String(r['거래유형']||'')!==catF) return false;
+    if(searchF&&!String(r['거래처']||'').toLowerCase().includes(searchF)&&!String(r['적요']||'').toLowerCase().includes(searchF)) return false;
+    return true;
+  });
+  document.getElementById('bankCount').textContent=rows.length+'건';
+  document.getElementById('bankBody').innerHTML=rows.length?rows.map(r=>{
+    const inc=Number(String(r['입금액']||0).replace(/,/g,''));
+    const out=Number(String(r['출금액']||0).replace(/,/g,''));
+    const bal=Number(String(r['잔액']||0).replace(/,/g,''));
+    const cat=String(r['거래유형']||'');
+    const catColor=cat.includes('매출')?'tag-green':cat.includes('세금')?'tag-amber':cat.includes('급여')?'tag-blue':'tag-gray';
+    return `<tr>
+      <td>${r['거래일자']||''}</td>
+      <td class="tc" style="color:var(--muted);font-size:11px;">${r['거래시간']||''}</td>
+      <td>${r['적요']||''}</td>
+      <td>${r['거래처']||''}</td>
+      <td class="tr" style="color:${inc>0?'var(--green-d)':'var(--muted)'};">${inc>0?Math.round(inc).toLocaleString():'-'}</td>
+      <td class="tr" style="color:${out>0?'var(--red-d)':'var(--muted)'};">${out>0?Math.round(out).toLocaleString():'-'}</td>
+      <td class="tr" style="font-weight:500;">${bal?Math.round(bal).toLocaleString():'-'}</td>
+      <td class="tc"><span class="tag ${catColor}" style="font-size:10px;">${cat}</span></td>
+    </tr>`;
+  }).join(''):'<tr><td colspan="8" class="no-data">해당하는 항목이 없습니다</td></tr>';
+}
+</script>
+</body>
+</html>
